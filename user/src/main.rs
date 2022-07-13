@@ -73,6 +73,8 @@ struct Args {
     get_idt_entries: bool,
 }
 
+use x86_64::structures::idt::{Entry, HandlerFunc};
+
 fn main() {
     let args = Args::parse();
 
@@ -83,7 +85,8 @@ fn main() {
             .get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::Bin)
             .unwrap();
 
-        println!("{}", String::from_utf8_lossy(attr));
+        let entry: Entry<HandlerFunc> = unsafe { std::ptr::read(attr.as_ptr() as *const _) };
+        println!("{:?}", entry);
     }
 
     return;
