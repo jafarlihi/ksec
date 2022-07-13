@@ -71,8 +71,6 @@ struct Args {
     get_idt_entries: bool,
 }
 
-const N_IDT: usize = 1024;
-
 fn main() {
     let args = Args::parse();
 
@@ -83,8 +81,8 @@ fn main() {
             .get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::Bin)
             .unwrap();
 
-        let entries = unsafe { std::slice::from_raw_parts(attr.as_ptr() as *const Entry<HandlerFunc>, N_IDT) };
-        for i in 0..N_IDT {
+        let entries = unsafe { std::slice::from_raw_parts(attr.as_ptr() as *const Entry<HandlerFunc>, 256) };
+        for i in 0..256 {
             if entries[i].handler_addr() != VirtAddr::new(0) {
                 println!("{}: {:?}", i, entries[i]);
             }
