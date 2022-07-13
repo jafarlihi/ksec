@@ -29,7 +29,6 @@ use neli::{
     types::{Buffer, GenlBuffer},
 };
 use std::process;
-use std::env;
 
 fn send_netlink_message(cmd: KsecCommand) -> Nlmsghdr<u16, Genlmsghdr<KsecCommand, KsecAttribute>> {
     let mut sock = NlSocketHandle::connect(
@@ -41,16 +40,6 @@ fn send_netlink_message(cmd: KsecCommand) -> Nlmsghdr<u16, Genlmsghdr<KsecComman
 
     let family_id = sock.resolve_genl_family(FAMILY_NAME).unwrap();
     let attrs: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
-    attrs.push(
-        Nlattr::new(
-            false,
-            false,
-            KsecAttribute::Msg,
-            ECHO_MSG,
-        )
-        .unwrap(),
-    );
-
 
     let gnmsghdr = Genlmsghdr::new(
         cmd,
@@ -75,23 +64,27 @@ fn send_netlink_message(cmd: KsecCommand) -> Nlmsghdr<u16, Genlmsghdr<KsecComman
     return res;
 }
 
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+struct Args {
+    #[clap(short, long, value_parser)]
+    get_idt_entries: bool,
+}
+
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let args = Args::parse();
 
-    let cmd: KsecCommand;
+    if args.get_idt_entries {
+        let res = send_netlink_message(KsecCommand::GetIDTEntries);
+        let attr_handle = res.get_payload().unwrap().get_attr_handle();
+        let attr = attr_handle
+            .get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::Bin)
+            .unwrap();
 
-    cmd = match args[1].as_str() {
-        "getIDTEntries" => KsecCommand::GetIDTEntries,
-        _ => KsecCommand::GetIDTEntries,
-    };
-
-    let res = send_netlink_message(cmd);
-    let attr_handle = res.get_payload().unwrap().get_attr_handle();
-    let attr = attr_handle
-        .get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::Bin)
-        .unwrap();
-
-    println!("{}", String::from_utf8_lossy(attr));
+        println!("{}", String::from_utf8_lossy(attr));
+    }
 
     return;
 }

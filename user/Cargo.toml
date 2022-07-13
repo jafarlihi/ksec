@@ -6,4 +6,5 @@ edition = "2021"
 publish = false
 
 [dependencies]
+clap = { version = "3.2.11", features = ["derive"] }
 neli = "0.6.1"
