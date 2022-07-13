@@ -1,0 +1,9 @@
+[package]
+name = "ksec"
+version = "0.1.0"
+authors = ["Hikmat Jafarli <jafarlihi@gmail.com>"]
+edition = "2021"
+publish = false
+
+[dependencies]
+neli = "0.6.1"

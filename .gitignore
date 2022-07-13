@@ -1,0 +1,5 @@
+Kbuild
+cmake-build-release
+.idea
+build
+.cache
