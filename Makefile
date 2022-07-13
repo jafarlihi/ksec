@@ -13,3 +13,8 @@ all:
 clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
 	rm -rf build
+
+cycle: clean all
+	-sudo rmmod ksec
+	sudo insmod ./build/ksec.ko
+
