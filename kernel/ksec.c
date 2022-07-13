@@ -10,7 +10,7 @@
 enum {
   KSEC_A_UNSPEC,
   KSEC_A_MSG,
-  KSEC_A_U16,
+  KSEC_A_U8,
   KSEC_A_BIN,
   __KSEC_A_MAX,
 };
@@ -25,7 +25,7 @@ enum {
 
 static struct nla_policy ksec_genl_policy[KSEC_A_MAX + 1] = {
   [KSEC_A_MSG] = { .type = NLA_NUL_STRING },
-  [KSEC_A_U16] = { .type = NLA_U16 },
+  [KSEC_A_U8] = { .type = NLA_U8 },
   [KSEC_A_BIN] = { .type = NLA_BINARY },
 };
 
