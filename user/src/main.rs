@@ -13,8 +13,7 @@ impl neli::consts::genl::Cmd for KsecCommand {}
 pub enum KsecAttribute {
     Unspec = 0,
     Msg = 1,
-    U8 = 2,
-    Bin = 3,
+    Bin = 2,
 }
 impl neli::consts::genl::NlAttrType for KsecAttribute {}
 
@@ -23,7 +22,7 @@ use neli::{
         nl::{NlmF, NlmFFlags},
         socket::NlFamily,
     },
-    genl::{Genlmsghdr, Nlattr},
+    genl::{Genlmsghdr},
     nl::{NlPayload, Nlmsghdr},
     socket::NlSocketHandle,
     types::{Buffer, GenlBuffer},
@@ -41,17 +40,7 @@ fn send_netlink_message(cmd: KsecCommand) -> Nlmsghdr<u16, Genlmsghdr<KsecComman
     ).unwrap();
 
     let family_id = sock.resolve_genl_family(FAMILY_NAME).unwrap();
-
-    let mut attrs: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
-    attrs.push(
-        Nlattr::new(
-            false,
-            false,
-            KsecAttribute::U8,
-            1 as u8,
-        ).unwrap(),
-    );
-
+    let attrs: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
     let gnmsghdr = Genlmsghdr::new(
         cmd,
         1,
@@ -97,7 +86,7 @@ fn main() {
         let entries = unsafe { std::slice::from_raw_parts(attr.as_ptr() as *const Entry<HandlerFunc>, N_IDT) };
         for i in 0..N_IDT {
             if entries[i].handler_addr() != VirtAddr::new(0) {
-                println!("{:?}", entries[i]);
+                println!("{}: {:?}", i, entries[i]);
             }
         }
     }

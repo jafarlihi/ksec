@@ -1,3 +1,4 @@
+#include "asm/segment.h"
 #include <linux/module.h>
 #include <linux/kprobes.h>
 #include <linux/fs.h>
@@ -10,7 +11,6 @@
 enum {
   KSEC_A_UNSPEC,
   KSEC_A_MSG,
-  KSEC_A_U8,
   KSEC_A_BIN,
   __KSEC_A_MAX,
 };
@@ -25,7 +25,6 @@ enum {
 
 static struct nla_policy ksec_genl_policy[KSEC_A_MAX + 1] = {
   [KSEC_A_MSG] = { .type = NLA_NUL_STRING },
-  [KSEC_A_U8] = { .type = NLA_U8 },
   [KSEC_A_BIN] = { .type = NLA_BINARY },
 };
 
@@ -75,9 +74,7 @@ typedef union {
   idt_entry_t structure;
 } idt_entry_u_t;
 
-#define N_IDT 1024
-
-idt_entry_u_t idt_entry_info_arr[N_IDT] = {0};
+idt_entry_u_t idt_entry_info_arr[IDT_ENTRIES] = {0};
 
 static int get_idt_entries(struct sk_buff *skb, struct genl_info *info) {
   for (int i = 0; i < IDT_ENTRIES; i++) {
@@ -86,19 +83,19 @@ static int get_idt_entries(struct sk_buff *skb, struct genl_info *info) {
     idt_entry_info_arr[i] = entry;
   }
 
-  u8 *to_send = kmalloc(sizeof(idt_entry_u_t) * N_IDT, GFP_KERNEL);
+  u8 *to_send = kmalloc(sizeof(idt_entry_u_t) * IDT_ENTRIES, GFP_KERNEL);
   if (to_send == NULL) {
     pr_err("An error occurred in %s()\n", __func__);
     return -ENOMEM;
   }
   u8 *to_send_p = to_send;
 
-  for (int i = 0; i < N_IDT; i++) {
+  for (int i = 0; i < IDT_ENTRIES; i++) {
     memcpy(to_send_p, &idt_entry_info_arr[i], sizeof(idt_entry_u_t));
     to_send_p += sizeof(idt_entry_u_t);
   }
 
-  struct sk_buff *reply_skb = genlmsg_new(sizeof(idt_entry_u_t) * N_IDT, GFP_KERNEL);
+  struct sk_buff *reply_skb = genlmsg_new(sizeof(idt_entry_u_t) * IDT_ENTRIES, GFP_KERNEL);
   if (reply_skb == NULL) {
     pr_err("An error occurred in %s():\n", __func__);
     return -ENOMEM;
@@ -110,7 +107,7 @@ static int get_idt_entries(struct sk_buff *skb, struct genl_info *info) {
     return -ENOMEM;
   }
 
-  int rc = nla_put(reply_skb, KSEC_A_BIN, sizeof(idt_entry_u_t) * N_IDT, to_send);
+  int rc = nla_put(reply_skb, KSEC_A_BIN, sizeof(idt_entry_u_t) * IDT_ENTRIES, to_send);
   if (rc != 0) {
     pr_err("An error occurred in %s()\n", __func__);
     return -rc;
