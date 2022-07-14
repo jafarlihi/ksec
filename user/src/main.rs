@@ -156,11 +156,12 @@ fn main() {
             let owner = get_virtaddr_owner(entries[i].handler_addr());
             if entries[i].handler_addr() != VirtAddr::new(0) {
                 if matches!(owner.0, AddrOwner::Module) || matches!(owner.0, AddrOwner::Process) {
+                    warn!("{}: {:?} -> {} (name: {})", i, entries[i], owner.0.to_string(), owner.1.unwrap());
+                } else if matches!(owner.0, AddrOwner::Unspec) {
                     warn!("{}: {:?} -> {}", i, entries[i], owner.0.to_string())
                 } else {
                     info!("{}: {:?} -> {}", i, entries[i], owner.0.to_string())
                 }
-                // TODO: Print process or module name
             }
         }
     }
