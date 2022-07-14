@@ -34,11 +34,14 @@ use neli::{
     socket::NlSocketHandle,
     types::{Buffer, GenlBuffer},
 };
+use procfs::process::MemoryMap;
 use x86_64::{VirtAddr};
+use x86_64::structures::idt::{Entry, HandlerFunc};
 use std::process;
 use clap::Parser;
 use std::fmt;
-use x86_64::structures::idt::{Entry, HandlerFunc};
+
+extern crate procfs;
 
 fn send_netlink_message(cmd: KsecCommand, attrs: GenlBuffer<KsecAttribute, Buffer>) -> Nlmsghdr<u16, Genlmsghdr<KsecCommand, KsecAttribute>> {
     let mut sock = NlSocketHandle::connect(
@@ -120,7 +123,15 @@ fn get_virtaddr_owner(va: VirtAddr) -> (AddrOwner, Option<String>) {
         let attr_handle = res.get_payload().unwrap().get_attr_handle();
         let attr = attr_handle.get_attr_payload_as_with_len::<String>(KsecAttribute::Str).unwrap();
         if attr.is_empty() {
-            (AddrOwner::Process, None) // TODO: Unspec or process? Process name?
+            for p in procfs::process::all_processes().unwrap() {
+                let mmaps: Vec<MemoryMap> = p.as_ref().unwrap().maps().unwrap();
+                for mmap in mmaps.iter() {
+                    if va.as_u64() >= mmap.address.0 && va.as_u64() <= mmap.address.1 {
+                        return (AddrOwner::Process, Some(String::from(p.unwrap().exe().unwrap().as_path().to_str().unwrap())));
+                    }
+                }
+            }
+            (AddrOwner::Unspec, None)
         } else {
             (AddrOwner::Module, Some(attr))
         }
