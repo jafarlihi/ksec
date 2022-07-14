@@ -1,3 +1,7 @@
+use log::{info, warn};
+extern crate pretty_env_logger;
+#[macro_use] extern crate log;
+
 use neli::neli_enum;
 
 const FAMILY_NAME: &str = "ksec";
@@ -126,6 +130,7 @@ fn get_virtaddr_owner(va: VirtAddr) -> (AddrOwner, Option<String>) {
 }
 
 fn main() {
+    pretty_env_logger::init();
     let args = Args::parse();
 
     if args.get_idt_entries {
@@ -139,7 +144,11 @@ fn main() {
         for i in 0..256 {
             let owner = get_virtaddr_owner(entries[i].handler_addr());
             if entries[i].handler_addr() != VirtAddr::new(0) {
-                println!("{}: {:?} -> {}", i, entries[i], owner.0.to_string());
+                if matches!(owner.0, AddrOwner::Module) || matches!(owner.0, AddrOwner::Process) {
+                    warn!("{}: {:?} -> {}", i, entries[i], owner.0.to_string())
+                } else {
+                    info!("{}: {:?} -> {}", i, entries[i], owner.0.to_string())
+                }
                 // TODO: Print process or module name
             }
         }
