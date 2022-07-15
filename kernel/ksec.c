@@ -150,29 +150,6 @@ static int is_module_addr(struct sk_buff *skb, struct genl_info *info) {
   return 0;
 }
 
-typedef struct {
-  u16 offset_0_15;
-  u16 selector;
-  struct access_byte {
-    u8 ist : 2;
-    u8 reserved : 4;
-    u8 gate_type : 3;
-    u8 zero : 1;
-    u8 dpl : 1;
-    u8 p : 1;
-  } ab;
-  u16 offset_16_31;
-  u32 offset_32_63;
-  u32 reserved;
-} __attribute__((packed)) idt_entry_t;
-
-typedef union {
-  unsigned __int128 scalar;
-  idt_entry_t structure;
-} idt_entry_u_t;
-
-idt_entry_u_t idt_entry_info_arr[IDT_ENTRIES] = {0};
-
 static int get_idt_entries(struct sk_buff *skb, struct genl_info *info) {
   unsigned __int128 *idt_table = (unsigned __int128 *)lookup("idt_table");
 
