@@ -1,8 +1,29 @@
 use log::{info, warn};
 extern crate pretty_env_logger;
-#[macro_use] extern crate log;
+extern crate log;
+extern crate procfs;
+extern crate proc_modules;
+extern crate capstone;
 
 use neli::neli_enum;
+use neli::{
+    consts::{
+        nl::{NlmF, NlmFFlags},
+        socket::NlFamily,
+    },
+    genl::{Genlmsghdr, Nlattr},
+    nl::{NlPayload, Nlmsghdr},
+    socket::NlSocketHandle,
+    types::{Buffer, GenlBuffer},
+};
+use procfs::process::MemoryMap;
+use x86_64::VirtAddr;
+use x86_64::structures::idt::{Entry, HandlerFunc};
+use std::process;
+use clap::Parser;
+use std::{fmt, str};
+use proc_modules::ModuleIter;
+use capstone::prelude::*;
 
 const FAMILY_NAME: &str = "ksec";
 
@@ -28,28 +49,6 @@ enum KsecAttribute {
     U64_1 = 4,
 }
 impl neli::consts::genl::NlAttrType for KsecAttribute {}
-
-use neli::{
-    consts::{
-        nl::{NlmF, NlmFFlags},
-        socket::NlFamily,
-    },
-    genl::{Genlmsghdr, Nlattr},
-    nl::{NlPayload, Nlmsghdr},
-    socket::NlSocketHandle,
-    types::{Buffer, GenlBuffer},
-};
-use procfs::process::MemoryMap;
-use x86_64::VirtAddr;
-use x86_64::structures::idt::{Entry, HandlerFunc};
-use std::process;
-use clap::Parser;
-use std::{fmt, str};
-
-extern crate procfs;
-extern crate proc_modules;
-
-use proc_modules::ModuleIter;
 
 fn send_netlink_message(cmd: KsecCommand, attrs: GenlBuffer<KsecAttribute, Buffer>) -> Nlmsghdr<u16, Genlmsghdr<KsecCommand, KsecAttribute>> {
     let mut sock = NlSocketHandle::connect(
@@ -95,6 +94,8 @@ struct Args {
     get_symbol_addr: Option<String>,
     #[clap(short = 'r', long, value_parser, number_of_values = 2, value_names=&["addr [hex with 0x]", "len"])]
     read: Option<Vec<String>>,
+    #[clap(short = 'd', long, value_parser)]
+    disassemble: bool,
 }
 
 fn virtaddr_to_nlattr(va: VirtAddr) -> GenlBuffer<KsecAttribute, Buffer> {
@@ -267,7 +268,21 @@ fn main() {
         let attr_handle = res.get_payload().unwrap().get_attr_handle();
         let attr = attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::Bin).unwrap();
 
-        println!("{:?}", attr);
+        if args.disassemble {
+            let cs = Capstone::new()
+                .x86()
+                .mode(arch::x86::ArchMode::Mode64)
+                .syntax(arch::x86::ArchSyntax::Att)
+                .detail(true)
+                .build()
+                .expect("Failed to create Capstone object");
+            let insns = cs.disasm_all(attr, 0x0).expect("Failed to disassemble");
+            for i in insns.as_ref() {
+                println!("{}", i);
+            }
+        } else {
+            println!("{:?}", attr);
+        }
     }
 
     return;
