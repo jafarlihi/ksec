@@ -25,7 +25,7 @@ enum {
   KSEC_C_GET_IDT_ENTRIES,
   KSEC_C_GET_SYSCALLS,
   KSEC_C_GET_MODULES,
-  KSEC_C_LOOKUP_SYMBOL,
+  KSEC_C_GET_SYMBOL_ADDR,
   __KSEC_C_MAX,
 };
 #define KSEC_C_MAX (__KSEC_C_MAX - 1)
@@ -39,6 +39,7 @@ static struct nla_policy ksec_genl_policy[KSEC_A_MAX + 1] = {
 static int get_idt_entries(struct sk_buff *, struct genl_info *);
 static int get_syscalls(struct sk_buff *, struct genl_info *);
 static int get_modules(struct sk_buff *, struct genl_info *);
+static int get_symbol_addr(struct sk_buff *, struct genl_info *);
 static int is_kernel_addr(struct sk_buff *, struct genl_info *);
 static int is_module_addr(struct sk_buff *, struct genl_info *);
 
@@ -73,6 +74,12 @@ static struct genl_ops ksec_ops[] = {
     .policy = ksec_genl_policy,
     .doit = get_modules,
   },
+  {
+    .cmd = KSEC_C_GET_SYMBOL_ADDR,
+    .flags = 0,
+    .policy = ksec_genl_policy,
+    .doit = get_symbol_addr,
+  },
 };
 
 static struct genl_family ksec_genl_family = {
@@ -82,7 +89,7 @@ static struct genl_family ksec_genl_family = {
   .version = 1,
   .maxattr = KSEC_A_MAX,
   .ops = ksec_ops,
-  .n_ops = 5,
+  .n_ops = 6,
 };
 
 typedef void *(*kallsyms_lookup_name_t)(const char *name);
@@ -269,12 +276,45 @@ static int get_modules(struct sk_buff *skb, struct genl_info *info) {
   return 0;
 }
 
+static int get_symbol_addr(struct sk_buff *skb, struct genl_info *info) {
+  char *name = nla_data(info->attrs[KSEC_A_STR]);
+
+  u64 addr = (u64)lookup(name);
+
+  struct sk_buff *reply_skb = genlmsg_new(sizeof(u64), GFP_KERNEL);
+  if (reply_skb == NULL) {
+    pr_err("An error occurred in %s()\n", __func__);
+    return -ENOMEM;
+  }
+
+  void *msg_head = genlmsg_put(reply_skb, info->snd_portid, info->snd_seq + 1, &ksec_genl_family, 0, KSEC_C_GET_SYMBOL_ADDR);
+  if (msg_head == NULL) {
+    pr_err("An error occurred in %s()\n", __func__);
+    return -ENOMEM;
+  }
+
+  int rc = nla_put(reply_skb, KSEC_A_U64, sizeof(u64), (void *)addr);
+  if (rc != 0) {
+    pr_err("An error occurred in %s()\n", __func__);
+    return -rc;
+  }
+
+  genlmsg_end(reply_skb, msg_head);
+  rc = genlmsg_reply(reply_skb, info);
+  if (rc != 0) {
+    pr_err("An error occurred in %s()\n", __func__);
+    return -rc;
+  }
+
+  return 0;
+}
+
 void resolve_kallsyms_lookup_name(void) {
   static struct kprobe kp = {
     .symbol_name = "kallsyms_lookup_name"
   };
   register_kprobe(&kp);
-  lookup = (kallsyms_lookup_name_t) kp.addr;
+  lookup = (kallsyms_lookup_name_t)kp.addr;
   unregister_kprobe(&kp);
 }
 
