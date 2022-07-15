@@ -22,6 +22,7 @@ enum {
   KSEC_C_IS_KERNEL_ADDR,
   KSEC_C_IS_MODULE_ADDR,
   KSEC_C_GET_IDT_ENTRIES,
+  KSEC_C_GET_SYSCALLS,
   __KSEC_C_MAX,
 };
 #define KSEC_C_MAX (__KSEC_C_MAX - 1)
@@ -33,6 +34,7 @@ static struct nla_policy ksec_genl_policy[KSEC_A_MAX + 1] = {
 };
 
 static int get_idt_entries(struct sk_buff *, struct genl_info *);
+static int get_syscalls(struct sk_buff *, struct genl_info *);
 static int is_kernel_addr(struct sk_buff *, struct genl_info *);
 static int is_module_addr(struct sk_buff *, struct genl_info *);
 
@@ -55,6 +57,12 @@ static struct genl_ops ksec_ops[] = {
     .policy = ksec_genl_policy,
     .doit = is_module_addr,
   },
+  {
+    .cmd = KSEC_C_GET_SYSCALLS,
+    .flags = 0,
+    .policy = ksec_genl_policy,
+    .doit = get_syscalls,
+  },
 };
 
 static struct genl_family ksec_genl_family = {
@@ -64,7 +72,7 @@ static struct genl_family ksec_genl_family = {
   .version = 1,
   .maxattr = KSEC_A_MAX,
   .ops = ksec_ops,
-  .n_ops = 3,
+  .n_ops = 4,
 };
 
 typedef void *(*kallsyms_lookup_name_t)(const char *name);
@@ -199,6 +207,37 @@ static int get_idt_entries(struct sk_buff *skb, struct genl_info *info) {
   }
 
   int rc = nla_put(reply_skb, KSEC_A_BIN, sizeof(idt_entry_u_t) * IDT_ENTRIES, to_send);
+  if (rc != 0) {
+    pr_err("An error occurred in %s()\n", __func__);
+    return -rc;
+  }
+
+  genlmsg_end(reply_skb, msg_head);
+  rc = genlmsg_reply(reply_skb, info);
+  if (rc != 0) {
+    pr_err("An error occurred in %s()\n", __func__);
+    return -rc;
+  }
+
+  return 0;
+}
+
+static int get_syscalls(struct sk_buff *skb, struct genl_info *info) {
+  sys_call_ptr_t *sys_call_table = lookup("sys_call_table");
+
+  struct sk_buff *reply_skb = genlmsg_new(sizeof(sys_call_ptr_t) * NR_syscalls, GFP_KERNEL);
+  if (reply_skb == NULL) {
+    pr_err("An error occurred in %s()\n", __func__);
+    return -ENOMEM;
+  }
+
+  void *msg_head = genlmsg_put(reply_skb, info->snd_portid, info->snd_seq + 1, &ksec_genl_family, 0, KSEC_C_GET_SYSCALLS);
+  if (msg_head == NULL) {
+    pr_err("An error occurred in %s()\n", __func__);
+    return -ENOMEM;
+  }
+
+  int rc = nla_put(reply_skb, KSEC_A_BIN, sizeof(sys_call_ptr_t) * NR_syscalls, sys_call_table);
   if (rc != 0) {
     pr_err("An error occurred in %s()\n", __func__);
     return -rc;

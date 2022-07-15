@@ -12,6 +12,7 @@ enum KsecCommand {
     IsKernelAddr = 1,
     IsModuleAddr = 2,
     GetIDTEntries = 3,
+    GetSyscalls = 4,
 }
 impl neli::consts::genl::Cmd for KsecCommand {}
 
@@ -35,7 +36,7 @@ use neli::{
     types::{Buffer, GenlBuffer},
 };
 use procfs::process::MemoryMap;
-use x86_64::{VirtAddr};
+use x86_64::VirtAddr;
 use x86_64::structures::idt::{Entry, HandlerFunc};
 use std::process;
 use clap::Parser;
@@ -77,8 +78,10 @@ fn send_netlink_message(cmd: KsecCommand, attrs: GenlBuffer<KsecAttribute, Buffe
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    #[clap(short, long, value_parser)]
+    #[clap(short = 'i', long, value_parser)]
     get_idt_entries: bool,
+    #[clap(short = 's', long, value_parser)]
+    get_syscalls: bool,
 }
 
 fn virtaddr_to_nlattr(va: VirtAddr) -> GenlBuffer<KsecAttribute, Buffer> {
@@ -140,6 +143,8 @@ fn get_virtaddr_owner(va: VirtAddr) -> (AddrOwner, Option<String>) {
     }
 }
 
+const NR_syscalls: usize = 449;
+
 fn main() {
     pretty_env_logger::init();
     let args = Args::parse();
@@ -161,6 +166,28 @@ fn main() {
                     warn!("{}: {:?} -> {}", i, entries[i], owner.0.to_string())
                 } else {
                     info!("{}: {:?} -> {}", i, entries[i], owner.0.to_string())
+                }
+            }
+        }
+    }
+
+    if args.get_syscalls {
+        let attrs: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
+        let res = send_netlink_message(KsecCommand::GetSyscalls, attrs);
+        let attr_handle = res.get_payload().unwrap().get_attr_handle();
+        let attr = attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::Bin).unwrap();
+
+        let entries = unsafe { std::slice::from_raw_parts(attr.as_ptr() as *const u64, NR_syscalls) };
+
+        for i in 0..NR_syscalls {
+            let owner = get_virtaddr_owner(VirtAddr::new(entries[i]));
+            if entries[i] != 0 {
+                if matches!(owner.0, AddrOwner::Module) || matches!(owner.0, AddrOwner::Process) {
+                    warn!("{}: {:X} -> {} (name: {})", i, entries[i], owner.0.to_string(), owner.1.unwrap());
+                } else if matches!(owner.0, AddrOwner::Unspec) {
+                    warn!("{}: {:X} -> {}", i, entries[i], owner.0.to_string())
+                } else {
+                    info!("{}: {:X} -> {}", i, entries[i], owner.0.to_string())
                 }
             }
         }
