@@ -1,9 +1,9 @@
-#include "asm/segment.h"
-#include "linux/gfp.h"
+#include <linux/gfp.h>
 #include <linux/module.h>
 #include <linux/kprobes.h>
 #include <linux/fs.h>
 #include <linux/types.h>
+#include <asm/segment.h>
 #include <asm/syscall.h>
 #include <asm/unistd.h>
 #include <asm/page.h>
@@ -25,6 +25,7 @@ enum {
   KSEC_C_GET_IDT_ENTRIES,
   KSEC_C_GET_SYSCALLS,
   KSEC_C_GET_MODULES,
+  KSEC_C_LOOKUP_SYMBOL,
   __KSEC_C_MAX,
 };
 #define KSEC_C_MAX (__KSEC_C_MAX - 1)
