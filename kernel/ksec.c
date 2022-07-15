@@ -176,25 +176,7 @@ idt_entry_u_t idt_entry_info_arr[IDT_ENTRIES] = {0};
 static int get_idt_entries(struct sk_buff *skb, struct genl_info *info) {
   unsigned __int128 *idt_table = (unsigned __int128 *)lookup("idt_table");
 
-  for (int i = 0; i < IDT_ENTRIES; i++) {
-    idt_entry_u_t entry;
-    entry.scalar = idt_table[i];
-    idt_entry_info_arr[i] = entry;
-  }
-
-  u8 *to_send = kmalloc(sizeof(idt_entry_u_t) * IDT_ENTRIES, GFP_KERNEL);
-  if (to_send == NULL) {
-    pr_err("An error occurred in %s()\n", __func__);
-    return -ENOMEM;
-  }
-  u8 *to_send_p = to_send;
-
-  for (int i = 0; i < IDT_ENTRIES; i++) {
-    memcpy(to_send_p, &idt_entry_info_arr[i], sizeof(idt_entry_u_t));
-    to_send_p += sizeof(idt_entry_u_t);
-  }
-
-  struct sk_buff *reply_skb = genlmsg_new(sizeof(idt_entry_u_t) * IDT_ENTRIES, GFP_KERNEL);
+  struct sk_buff *reply_skb = genlmsg_new(sizeof(unsigned __int128) * IDT_ENTRIES, GFP_KERNEL);
   if (reply_skb == NULL) {
     pr_err("An error occurred in %s()\n", __func__);
     return -ENOMEM;
@@ -206,7 +188,7 @@ static int get_idt_entries(struct sk_buff *skb, struct genl_info *info) {
     return -ENOMEM;
   }
 
-  int rc = nla_put(reply_skb, KSEC_A_BIN, sizeof(idt_entry_u_t) * IDT_ENTRIES, to_send);
+  int rc = nla_put(reply_skb, KSEC_A_BIN, sizeof(unsigned __int128) * IDT_ENTRIES, idt_table);
   if (rc != 0) {
     pr_err("An error occurred in %s()\n", __func__);
     return -rc;
