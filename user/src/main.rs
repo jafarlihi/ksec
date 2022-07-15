@@ -226,14 +226,22 @@ fn main() {
     }
 
     if !args.get_symbol_addr.is_empty() {
-        let attrs: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
+        let mut attrs: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
+        attrs.push(
+            Nlattr::new(
+                false,
+                false,
+                KsecAttribute::Str,
+                args.get_symbol_addr,
+            ).unwrap(),
+        );
         let res = send_netlink_message(KsecCommand::GetSymbolAddr, attrs);
         let attr_handle = res.get_payload().unwrap().get_attr_handle();
         let attr = attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::U64_0).unwrap();
 
         let mut attr8 = [0u8; 8];
         attr8.clone_from_slice(&attr[0..8]);
-        info!("{}", u64::from_le_bytes(attr8));
+        info!("{:X}", u64::from_le_bytes(attr8));
     }
 
     return;
