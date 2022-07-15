@@ -303,7 +303,7 @@ static int get_symbol_addr(struct sk_buff *skb, struct genl_info *info) {
     return -ENOMEM;
   }
 
-  int rc = nla_put(reply_skb, KSEC_A_U64_0, sizeof(u64), (void *)addr);
+  int rc = nla_put_u64_64bit(reply_skb, KSEC_A_U64_0, addr, 0);
   if (rc != 0) {
     pr_err("An error occurred in %s()\n", __func__);
     return -rc;
