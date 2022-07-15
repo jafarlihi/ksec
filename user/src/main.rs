@@ -265,7 +265,7 @@ fn main() {
         );
         let res = send_netlink_message(KsecCommand::Read, attrs);
         let attr_handle = res.get_payload().unwrap().get_attr_handle();
-        let attr = attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::U64_0).unwrap();
+        let attr = attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::Bin).unwrap();
 
         println!("{:?}", attr);
     }
