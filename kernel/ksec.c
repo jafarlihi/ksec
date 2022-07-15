@@ -327,7 +327,7 @@ static int read(struct sk_buff *skb, struct genl_info *info) {
     pr_err("An error occurred in %s()\n", __func__);
     return e;
   }
-  u64 len = nla_get_u64(info->attrs[KSEC_A_U64_1]);
+  u64 len = nla_get_u64(info->attrs[KSEC_A_U64_0]);
 
   struct sk_buff *reply_skb = genlmsg_new(len, GFP_KERNEL);
   if (reply_skb == NULL) {
