@@ -14,6 +14,8 @@ enum KsecCommand {
     GetIDTEntries = 3,
     GetSyscalls = 4,
     GetModules = 5,
+    GetSymbolAddr = 6,
+    Read = 7,
 }
 impl neli::consts::genl::Cmd for KsecCommand {}
 
@@ -22,7 +24,8 @@ enum KsecAttribute {
     Unspec = 0,
     Str = 1,
     Bin = 2,
-    U64 = 3,
+    U64_0 = 3,
+    U64_1 = 4,
 }
 impl neli::consts::genl::NlAttrType for KsecAttribute {}
 
@@ -88,6 +91,10 @@ struct Args {
     get_syscalls: bool,
     #[clap(short = 'm', long, value_parser)]
     get_modules: bool,
+    #[clap(short = 'a', long, value_parser, value_names=&["symbol"])]
+    get_symbol_addr: String,
+    #[clap(short = 'r', long, value_parser, number_of_values = 2, value_names=&["addr", "len"])]
+    read: Vec<String>,
 }
 
 fn virtaddr_to_nlattr(va: VirtAddr) -> GenlBuffer<KsecAttribute, Buffer> {
@@ -96,7 +103,7 @@ fn virtaddr_to_nlattr(va: VirtAddr) -> GenlBuffer<KsecAttribute, Buffer> {
         Nlattr::new(
             false,
             false,
-            KsecAttribute::U64,
+            KsecAttribute::U64_0,
             va.as_u64(),
         ).unwrap(),
     );
@@ -125,7 +132,7 @@ fn get_virtaddr_owner(va: VirtAddr) -> (AddrOwner, Option<String>) {
     let attrs = virtaddr_to_nlattr(va);
     let res = send_netlink_message(KsecCommand::IsKernelAddr, attrs);
     let attr_handle = res.get_payload().unwrap().get_attr_handle();
-    let attr = attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::U64).unwrap();
+    let attr = attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::U64_0).unwrap();
     if !attr.iter().any(|&v| v > 0) {
         let attrs = virtaddr_to_nlattr(va);
         let res = send_netlink_message(KsecCommand::IsModuleAddr, attrs);
@@ -216,6 +223,17 @@ fn main() {
             }
             warn!("{} -> Hidden", module);
         }
+    }
+
+    if !args.get_symbol_addr.is_empty() {
+        let attrs: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
+        let res = send_netlink_message(KsecCommand::GetSymbolAddr, attrs);
+        let attr_handle = res.get_payload().unwrap().get_attr_handle();
+        let attr = attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::U64_0).unwrap();
+
+        let mut attr8 = [0u8; 8];
+        attr8.clone_from_slice(&attr[0..8]);
+        info!("{}", u64::from_le_bytes(attr8));
     }
 
     return;
