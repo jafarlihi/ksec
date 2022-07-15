@@ -1,4 +1,5 @@
 #include "asm/segment.h"
+#include "linux/gfp.h"
 #include <linux/module.h>
 #include <linux/kprobes.h>
 #include <linux/fs.h>
@@ -23,6 +24,7 @@ enum {
   KSEC_C_IS_MODULE_ADDR,
   KSEC_C_GET_IDT_ENTRIES,
   KSEC_C_GET_SYSCALLS,
+  KSEC_C_GET_MODULES,
   __KSEC_C_MAX,
 };
 #define KSEC_C_MAX (__KSEC_C_MAX - 1)
@@ -35,6 +37,7 @@ static struct nla_policy ksec_genl_policy[KSEC_A_MAX + 1] = {
 
 static int get_idt_entries(struct sk_buff *, struct genl_info *);
 static int get_syscalls(struct sk_buff *, struct genl_info *);
+static int get_modules(struct sk_buff *, struct genl_info *);
 static int is_kernel_addr(struct sk_buff *, struct genl_info *);
 static int is_module_addr(struct sk_buff *, struct genl_info *);
 
@@ -63,6 +66,12 @@ static struct genl_ops ksec_ops[] = {
     .policy = ksec_genl_policy,
     .doit = get_syscalls,
   },
+  {
+    .cmd = KSEC_C_GET_MODULES,
+    .flags = 0,
+    .policy = ksec_genl_policy,
+    .doit = get_modules,
+  },
 };
 
 static struct genl_family ksec_genl_family = {
@@ -72,7 +81,7 @@ static struct genl_family ksec_genl_family = {
   .version = 1,
   .maxattr = KSEC_A_MAX,
   .ops = ksec_ops,
-  .n_ops = 4,
+  .n_ops = 5,
 };
 
 typedef void *(*kallsyms_lookup_name_t)(const char *name);
@@ -197,6 +206,53 @@ static int get_syscalls(struct sk_buff *skb, struct genl_info *info) {
   }
 
   int rc = nla_put(reply_skb, KSEC_A_BIN, sizeof(sys_call_ptr_t) * NR_syscalls, sys_call_table);
+  if (rc != 0) {
+    pr_err("An error occurred in %s()\n", __func__);
+    return -rc;
+  }
+
+  genlmsg_end(reply_skb, msg_head);
+  rc = genlmsg_reply(reply_skb, info);
+  if (rc != 0) {
+    pr_err("An error occurred in %s()\n", __func__);
+    return -rc;
+  }
+
+  return 0;
+}
+
+static int get_modules(struct sk_buff *skb, struct genl_info *info) {
+  struct kset *mod_kset = lookup("module_kset");
+  struct kobject *cur, *tmp;
+  char *buf = kzalloc(32000, GFP_KERNEL);
+  unsigned int buf_p = 0;
+
+  list_for_each_entry_safe(cur, tmp, &mod_kset->list, entry) {
+    if (!kobject_name(tmp))
+      break;
+
+    struct module_kobject *kobj = container_of(tmp, struct module_kobject, kobj);
+
+    if (kobj && kobj->mod) {
+      strcat(buf + buf_p, kobj->mod->name);
+      strcat(buf, " ");
+      buf_p += strlen(kobj->mod->name) + 1;
+    }
+  }
+
+  struct sk_buff *reply_skb = genlmsg_new(buf_p, GFP_KERNEL);
+  if (reply_skb == NULL) {
+    pr_err("An error occurred in %s()\n", __func__);
+    return -ENOMEM;
+  }
+
+  void *msg_head = genlmsg_put(reply_skb, info->snd_portid, info->snd_seq + 1, &ksec_genl_family, 0, KSEC_C_GET_MODULES);
+  if (msg_head == NULL) {
+    pr_err("An error occurred in %s()\n", __func__);
+    return -ENOMEM;
+  }
+
+  int rc = nla_put(reply_skb, KSEC_A_BIN, buf_p, buf);
   if (rc != 0) {
     pr_err("An error occurred in %s()\n", __func__);
     return -rc;

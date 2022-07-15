@@ -13,6 +13,7 @@ enum KsecCommand {
     IsModuleAddr = 2,
     GetIDTEntries = 3,
     GetSyscalls = 4,
+    GetModules = 5,
 }
 impl neli::consts::genl::Cmd for KsecCommand {}
 
@@ -40,9 +41,12 @@ use x86_64::VirtAddr;
 use x86_64::structures::idt::{Entry, HandlerFunc};
 use std::process;
 use clap::Parser;
-use std::fmt;
+use std::{fmt, str};
 
 extern crate procfs;
+extern crate proc_modules;
+
+use proc_modules::ModuleIter;
 
 fn send_netlink_message(cmd: KsecCommand, attrs: GenlBuffer<KsecAttribute, Buffer>) -> Nlmsghdr<u16, Genlmsghdr<KsecCommand, KsecAttribute>> {
     let mut sock = NlSocketHandle::connect(
@@ -82,6 +86,8 @@ struct Args {
     get_idt_entries: bool,
     #[clap(short = 's', long, value_parser)]
     get_syscalls: bool,
+    #[clap(short = 'm', long, value_parser)]
+    get_modules: bool,
 }
 
 fn virtaddr_to_nlattr(va: VirtAddr) -> GenlBuffer<KsecAttribute, Buffer> {
@@ -190,6 +196,25 @@ fn main() {
                     info!("{}: {:X} -> {}", i, entries[i], owner.0.to_string())
                 }
             }
+        }
+    }
+
+    if args.get_modules {
+        let attrs: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
+        let res = send_netlink_message(KsecCommand::GetModules, attrs);
+        let attr_handle = res.get_payload().unwrap().get_attr_handle();
+        let attr = attr_handle.get_attr_payload_as_with_len::<String>(KsecAttribute::Bin).unwrap();
+
+        let modules = attr.split(' ');
+
+        'outer: for module in modules {
+            for proc_module in ModuleIter::new().unwrap() {
+                if module.eq(&proc_module.unwrap().module) {
+                    info!("{}", module);
+                    continue 'outer;
+                }
+            }
+            warn!("{} -> Hidden", module);
         }
     }
 
