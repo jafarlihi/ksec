@@ -320,7 +320,13 @@ static int get_symbol_addr(struct sk_buff *skb, struct genl_info *info) {
 }
 
 static int read(struct sk_buff *skb, struct genl_info *info) {
-  u64 va = nla_get_u64(info->attrs[KSEC_A_U64_0]);
+  char *va_str = nla_data(info->attrs[KSEC_A_STR]);
+  u64 va;
+  int e = kstrtoull(va_str, 16, &va);
+  if (e != 0) {
+    pr_err("An error occurred in %s()\n", __func__);
+    return e;
+  }
   u64 len = nla_get_u64(info->attrs[KSEC_A_U64_1]);
 
   struct sk_buff *reply_skb = genlmsg_new(len, GFP_KERNEL);

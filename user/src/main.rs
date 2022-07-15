@@ -92,9 +92,9 @@ struct Args {
     #[clap(short = 'm', long, value_parser)]
     get_modules: bool,
     #[clap(short = 'a', long, value_parser, value_names=&["symbol"])]
-    get_symbol_addr: String,
-    #[clap(short = 'r', long, value_parser, number_of_values = 2, value_names=&["addr", "len"])]
-    read: Vec<String>,
+    get_symbol_addr: Option<String>,
+    #[clap(short = 'r', long, value_parser, number_of_values = 2, value_names=&["addr [hex with 0x]", "len"])]
+    read: Option<Vec<String>>,
 }
 
 fn virtaddr_to_nlattr(va: VirtAddr) -> GenlBuffer<KsecAttribute, Buffer> {
@@ -225,14 +225,14 @@ fn main() {
         }
     }
 
-    if !args.get_symbol_addr.is_empty() {
+    if !args.get_symbol_addr.is_none() {
         let mut attrs: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
         attrs.push(
             Nlattr::new(
                 false,
                 false,
                 KsecAttribute::Str,
-                args.get_symbol_addr,
+                args.get_symbol_addr.unwrap(),
             ).unwrap(),
         );
         let res = send_netlink_message(KsecCommand::GetSymbolAddr, attrs);
@@ -242,6 +242,32 @@ fn main() {
         let mut attr8 = [0u8; 8];
         attr8.clone_from_slice(&attr[0..8]);
         info!("{:X}", u64::from_le_bytes(attr8));
+    }
+
+    if !args.read.is_none() {
+        let read_args = args.read.unwrap();
+        let mut attrs: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
+        attrs.push(
+            Nlattr::new(
+                false,
+                false,
+                KsecAttribute::Str,
+                read_args[0].clone(),
+            ).unwrap(),
+        );
+        attrs.push(
+            Nlattr::new(
+                false,
+                false,
+                KsecAttribute::U64_0,
+                read_args[1].parse::<u64>().unwrap(),
+            ).unwrap(),
+        );
+        let res = send_netlink_message(KsecCommand::Read, attrs);
+        let attr_handle = res.get_payload().unwrap().get_attr_handle();
+        let attr = attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::U64_0).unwrap();
+
+        println!("{:?}", attr);
     }
 
     return;
