@@ -1,3 +1,5 @@
+use capstone::InsnGroupType::CS_GRP_BRANCH_RELATIVE;
+use capstone::arch::x86::X86InsnDetail;
 use log::{info, warn};
 extern crate pretty_env_logger;
 extern crate log;
@@ -280,6 +282,15 @@ fn main() {
             let insns = cs.disasm_all(attr, base_addr).expect("Failed to disassemble");
             for i in insns.as_ref() {
                 println!("{}", i);
+                /*
+                let detail = cs.insn_detail(i).unwrap();
+                for g in detail.groups() {
+                    if g.0 == CS_GRP_BRANCH_RELATIVE as u8 {
+                    }
+                }
+                for o in cs.insn_detail(i).unwrap().arch_detail().operands() {
+                }
+                */
             }
         } else {
             println!("{:?}", attr);
