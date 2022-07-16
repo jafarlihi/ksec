@@ -1,5 +1,4 @@
 use capstone::InsnGroupType::CS_GRP_BRANCH_RELATIVE;
-use capstone::arch::x86::X86InsnDetail;
 use log::{info, warn};
 extern crate pretty_env_logger;
 extern crate log;
@@ -312,7 +311,35 @@ fn main() {
     }
 
     if args.hook_netif_rx {
+        let addr_raw = get_symbol_addr("netif_rx".to_string());
+        let addr = format!("0x{:X}", u64::from_le_bytes(addr_raw));
+        let data = read_addr(addr, 50);
 
+        let cs = Capstone::new()
+            .x86()
+            .mode(arch::x86::ArchMode::Mode64)
+            .syntax(arch::x86::ArchSyntax::Att)
+            .detail(true)
+            .build()
+            .expect("Failed to create Capstone object");
+        let insns = cs.disasm_all(&data as &[u8], u64::from_le_bytes(addr_raw)).expect("Failed to disassemble");
+        let mut bytes_past: usize = 0;
+        let mut insns_past: usize = 0;
+        for i in insns.as_ref() {
+            if bytes_past > 12 {
+                break;
+            }
+            bytes_past += i.bytes().len();
+            insns_past += 1;
+        }
+        for i in 0..insns_past {
+            let detail = cs.insn_detail(&insns.as_ref()[i]).unwrap();
+            for g in detail.groups() {
+                if g.0 == CS_GRP_BRANCH_RELATIVE as u8 {
+                    panic!("Relative branching instruction found within first 13 bytes");
+                }
+            }
+        }
     }
 
     return;
