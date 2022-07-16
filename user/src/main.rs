@@ -281,14 +281,14 @@ fn main() {
             let base_addr = u64::from_str_radix(read_args[0].clone().trim_start_matches("0x"), 16).unwrap();
             let insns = cs.disasm_all(attr, base_addr).expect("Failed to disassemble");
             for i in insns.as_ref() {
-                println!("{}", i);
+                println!("{} {:x?}", i, i.bytes());
                 /*
                 let detail = cs.insn_detail(i).unwrap();
                 for g in detail.groups() {
                     if g.0 == CS_GRP_BRANCH_RELATIVE as u8 {
                     }
                 }
-                for o in cs.insn_detail(i).unwrap().arch_detail().operands() {
+                for o in detail.arch_detail().operands() {
                 }
                 */
             }
