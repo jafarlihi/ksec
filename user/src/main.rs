@@ -98,6 +98,8 @@ struct Args {
     read: Option<Vec<String>>,
     #[clap(short = 'd', long, value_parser)]
     disassemble: bool,
+    #[clap(short = 'n', long, value_parser)]
+    hook_netif_rx: bool,
 }
 
 fn virtaddr_to_nlattr(va: VirtAddr) -> GenlBuffer<KsecAttribute, Buffer> {
@@ -157,6 +159,48 @@ fn get_virtaddr_owner(va: VirtAddr) -> (AddrOwner, Option<String>) {
     } else {
         (AddrOwner::Kernel, None)
     }
+}
+
+fn get_symbol_addr(symbol: String) -> [u8; 8] {
+    let mut attrs: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
+    attrs.push(
+        Nlattr::new(
+            false,
+            false,
+            KsecAttribute::Str,
+            symbol
+        ).unwrap(),
+    );
+    let res = send_netlink_message(KsecCommand::GetSymbolAddr, attrs);
+    let attr_handle = res.get_payload().unwrap().get_attr_handle();
+    let attr = attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::U64_0).unwrap();
+
+    let mut attr8 = [0u8; 8];
+    attr8.clone_from_slice(&attr[0..8]);
+    attr8
+}
+
+fn read_addr(addr: String, len: u64) -> Vec<u8> {
+    let mut attrs: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
+    attrs.push(
+        Nlattr::new(
+            false,
+            false,
+            KsecAttribute::Str,
+            addr,
+        ).unwrap(),
+    );
+    attrs.push(
+        Nlattr::new(
+            false,
+            false,
+            KsecAttribute::U64_0,
+            len,
+        ).unwrap(),
+    );
+    let res = send_netlink_message(KsecCommand::Read, attrs);
+    let attr_handle = res.get_payload().unwrap().get_attr_handle();
+    attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::Bin).unwrap().to_vec()
 }
 
 const NR_syscalls: usize = 449;
@@ -229,46 +273,16 @@ fn main() {
     }
 
     if !args.get_symbol_addr.is_none() {
-        let mut attrs: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
-        attrs.push(
-            Nlattr::new(
-                false,
-                false,
-                KsecAttribute::Str,
-                args.get_symbol_addr.unwrap(),
-            ).unwrap(),
-        );
-        let res = send_netlink_message(KsecCommand::GetSymbolAddr, attrs);
-        let attr_handle = res.get_payload().unwrap().get_attr_handle();
-        let attr = attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::U64_0).unwrap();
-
-        let mut attr8 = [0u8; 8];
-        attr8.clone_from_slice(&attr[0..8]);
-        info!("{:X}", u64::from_le_bytes(attr8));
+        let addr = get_symbol_addr(args.get_symbol_addr.unwrap());
+        info!("{:X}", u64::from_le_bytes(addr));
     }
 
     if !args.read.is_none() {
         let read_args = args.read.unwrap();
-        let mut attrs: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
-        attrs.push(
-            Nlattr::new(
-                false,
-                false,
-                KsecAttribute::Str,
-                read_args[0].clone(),
-            ).unwrap(),
-        );
-        attrs.push(
-            Nlattr::new(
-                false,
-                false,
-                KsecAttribute::U64_0,
-                read_args[1].parse::<u64>().unwrap(),
-            ).unwrap(),
-        );
-        let res = send_netlink_message(KsecCommand::Read, attrs);
-        let attr_handle = res.get_payload().unwrap().get_attr_handle();
-        let attr = attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::Bin).unwrap();
+        let addr = read_args[0].clone();
+        let len = read_args[1].parse::<u64>().unwrap();
+
+        let data = read_addr(addr, len);
 
         if args.disassemble {
             let cs = Capstone::new()
@@ -279,22 +293,26 @@ fn main() {
                 .build()
                 .expect("Failed to create Capstone object");
             let base_addr = u64::from_str_radix(read_args[0].clone().trim_start_matches("0x"), 16).unwrap();
-            let insns = cs.disasm_all(attr, base_addr).expect("Failed to disassemble");
+            let insns = cs.disasm_all(&data as &[u8], base_addr).expect("Failed to disassemble");
             for i in insns.as_ref() {
                 println!("{} {:x?}", i, i.bytes());
                 /*
-                let detail = cs.insn_detail(i).unwrap();
-                for g in detail.groups() {
-                    if g.0 == CS_GRP_BRANCH_RELATIVE as u8 {
-                    }
-                }
-                for o in detail.arch_detail().operands() {
-                }
-                */
+                   let detail = cs.insn_detail(i).unwrap();
+                   for g in detail.groups() {
+                   if g.0 == CS_GRP_BRANCH_RELATIVE as u8 {
+                   }
+                   }
+                   for o in detail.arch_detail().operands() {
+                   }
+                   */
             }
         } else {
-            println!("{:?}", attr);
+            println!("{:?}", data);
         }
+    }
+
+    if args.hook_netif_rx {
+
     }
 
     return;
