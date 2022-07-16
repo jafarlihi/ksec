@@ -276,7 +276,8 @@ fn main() {
                 .detail(true)
                 .build()
                 .expect("Failed to create Capstone object");
-            let insns = cs.disasm_all(attr, 0x0).expect("Failed to disassemble");
+            let base_addr = u64::from_str_radix(read_args[0].clone().trim_start_matches("0x"), 16).unwrap();
+            let insns = cs.disasm_all(attr, base_addr).expect("Failed to disassemble");
             for i in insns.as_ref() {
                 println!("{}", i);
             }
