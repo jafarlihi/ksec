@@ -5,6 +5,7 @@ extern crate log;
 extern crate procfs;
 extern crate proc_modules;
 extern crate capstone;
+extern crate keystone;
 
 use neli::neli_enum;
 use neli::{
@@ -25,6 +26,7 @@ use clap::Parser;
 use std::{fmt, str};
 use proc_modules::ModuleIter;
 use capstone::prelude::*;
+use keystone::{Keystone, Arch, OptionType};
 
 const FAMILY_NAME: &str = "ksec";
 
@@ -38,6 +40,7 @@ enum KsecCommand {
     GetModules = 5,
     GetSymbolAddr = 6,
     Read = 7,
+    AllocExecMem = 8,
 }
 impl neli::consts::genl::Cmd for KsecCommand {}
 
@@ -295,15 +298,6 @@ fn main() {
             let insns = cs.disasm_all(&data as &[u8], base_addr).expect("Failed to disassemble");
             for i in insns.as_ref() {
                 println!("{} {:x?}", i, i.bytes());
-                /*
-                   let detail = cs.insn_detail(i).unwrap();
-                   for g in detail.groups() {
-                   if g.0 == CS_GRP_BRANCH_RELATIVE as u8 {
-                   }
-                   }
-                   for o in detail.arch_detail().operands() {
-                   }
-                   */
             }
         } else {
             println!("{:?}", data);
@@ -325,6 +319,7 @@ fn main() {
         let insns = cs.disasm_all(&data as &[u8], u64::from_le_bytes(addr_raw)).expect("Failed to disassemble");
         let mut bytes_past: usize = 0;
         let mut insns_past: usize = 0;
+
         for i in insns.as_ref() {
             if bytes_past > 12 {
                 break;
@@ -332,6 +327,7 @@ fn main() {
             bytes_past += i.bytes().len();
             insns_past += 1;
         }
+
         for i in 0..insns_past {
             let detail = cs.insn_detail(&insns.as_ref()[i]).unwrap();
             for g in detail.groups() {
@@ -340,6 +336,23 @@ fn main() {
                 }
             }
         }
+
+        let replaced_code = data[0..bytes_past].to_vec();
+
+        let attrs: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
+        let res = send_netlink_message(KsecCommand::AllocExecMem, attrs);
+        let attr_handle = res.get_payload().unwrap().get_attr_handle();
+        let exec_addr = attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::U64_0).unwrap();
+
+        println!("{:x?}", exec_addr);
+        /*
+        let engine = Keystone::new(Arch::X86, keystone::MODE_64)
+            .expect("Could not initialize Keystone engine");
+        engine.option(OptionType::SYNTAX, keystone::OPT_SYNTAX_ATT)
+            .expect("Could not set option to AT&T syntax");
+        let result = engine.asm("".to_string(), 0)
+            .expect("Could not assemble");
+        */
     }
 
     return;
