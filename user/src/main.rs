@@ -5,7 +5,6 @@ extern crate log;
 extern crate procfs;
 extern crate proc_modules;
 extern crate capstone;
-extern crate keystone;
 
 use neli::neli_enum;
 use neli::{
@@ -26,7 +25,6 @@ use clap::Parser;
 use std::{fmt, str};
 use proc_modules::ModuleIter;
 use capstone::prelude::*;
-use keystone::{Keystone, Arch, OptionType};
 
 const FAMILY_NAME: &str = "ksec";
 
@@ -205,7 +203,7 @@ fn read_addr(addr: String, len: u64) -> Vec<u8> {
     attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::Bin).unwrap().to_vec()
 }
 
-const NR_syscalls: usize = 449;
+const NR_SYSCALLS: usize = 449;
 
 fn main() {
     pretty_env_logger::init();
@@ -239,9 +237,9 @@ fn main() {
         let attr_handle = res.get_payload().unwrap().get_attr_handle();
         let attr = attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::Bin).unwrap();
 
-        let entries = unsafe { std::slice::from_raw_parts(attr.as_ptr() as *const u64, NR_syscalls) };
+        let entries = unsafe { std::slice::from_raw_parts(attr.as_ptr() as *const u64, NR_SYSCALLS) };
 
-        for i in 0..NR_syscalls {
+        for i in 0..NR_SYSCALLS {
             let owner = get_virtaddr_owner(VirtAddr::new(entries[i]));
             if entries[i] != 0 {
                 if matches!(owner.0, AddrOwner::Module) || matches!(owner.0, AddrOwner::Process) {
@@ -344,15 +342,18 @@ fn main() {
         let attr_handle = res.get_payload().unwrap().get_attr_handle();
         let exec_addr = attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::U64_0).unwrap();
 
-        println!("{:x?}", exec_addr);
-        /*
-        let engine = Keystone::new(Arch::X86, keystone::MODE_64)
-            .expect("Could not initialize Keystone engine");
-        engine.option(OptionType::SYNTAX, keystone::OPT_SYNTAX_ATT)
-            .expect("Could not set option to AT&T syntax");
-        let result = engine.asm("".to_string(), 0)
-            .expect("Could not assemble");
-        */
+        let mut exec_addr8 = [0u8; 8];
+        exec_addr8.clone_from_slice(&exec_addr[0..8]);
+
+        let movabs: [u8; 2] = [0x49, 0xBA];
+        let insn = [&movabs, &exec_addr8 as &[u8]].concat();
+        let insn2: [u8; 3] = [0x41, 0xFF, 0xE2];
+        // add nops till bytes_past
+        // send insns, exec_addr, replaced_code to mod
+        // insert insns into netif_rx+0
+        // in exec_addr, pull out sk_buff, append replaced_code, append jump to netif_rx+len(insns)
+
+        println!("{:x?}", insn);
     }
 
     return;
