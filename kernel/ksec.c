@@ -417,6 +417,16 @@ static void write_cr0_unsafe(unsigned long val) {
   asm volatile("mov %0,%%cr0": "+r" (val) : : "memory");
 }
 
+static void consume_sk_buff(struct sk_buff *skb) {
+  printk("%x\n", skb);
+}
+
+static void __attribute__((naked)) shim(void) {
+  asm volatile(
+    "call %P0\n\tnop\n\tnop\n\tnop" : : "i"(consume_sk_buff)
+  );
+}
+
 static int hook(struct sk_buff *skb, struct genl_info *info) {
   u64 exec_addr = nla_get_u64(info->attrs[KSEC_A_U64_0]);
   u64 hook_addr = nla_get_u64(info->attrs[KSEC_A_U64_1]);
@@ -430,9 +440,18 @@ static int hook(struct sk_buff *skb, struct genl_info *info) {
   memcpy((void *)hook_addr, insns, insns_len);
   write_cr0_unsafe(old_cr0);
 
-  // TODO: Pull out sk_buff param
-  memcpy((void *)exec_addr, replaced, insns_len);
-  memcpy((char *)exec_addr + insns_len, jmp_back_insns, 13);
+  char *shim_p = (char *)&shim;
+  u64 shim_s = 0;
+  while (true) {
+    if (shim_p[shim_s] == 0x90 && shim_p[shim_s + 1] == 0x90 && shim_p[shim_s + 2] == 0x90)
+      break;
+    shim_s++;
+    shim_p++;
+  }
+
+  memcpy((void *)exec_addr, &shim, shim_s);
+  memcpy((char *)exec_addr + shim_s, replaced, insns_len);
+  memcpy((char *)exec_addr + shim_s + insns_len, jmp_back_insns, 13);
 
   struct sk_buff *reply_skb = genlmsg_new(sizeof(u64), GFP_KERNEL);
   if (reply_skb == NULL) {
