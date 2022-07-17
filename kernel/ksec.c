@@ -45,6 +45,7 @@ static struct nla_policy ksec_genl_policy[KSEC_A_MAX + 1] = {
   [KSEC_A_U64_2] = { .type = NLA_U64 },
   [KSEC_A_BIN_0] = { .type = NLA_BINARY },
   [KSEC_A_BIN_1] = { .type = NLA_BINARY },
+  [KSEC_A_BIN_2] = { .type = NLA_BINARY },
 };
 
 static int get_idt_entries(struct sk_buff *, struct genl_info *);
