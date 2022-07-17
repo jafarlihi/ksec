@@ -315,6 +315,7 @@ fn main() {
             .build()
             .expect("Failed to create Capstone object");
         let insns = cs.disasm_all(&data as &[u8], u64::from_le_bytes(addr_raw)).expect("Failed to disassemble");
+
         let mut bytes_past: usize = 0;
         let mut insns_past: usize = 0;
 
@@ -345,15 +346,20 @@ fn main() {
         let mut exec_addr8 = [0u8; 8];
         exec_addr8.clone_from_slice(&exec_addr[0..8]);
 
-        let movabs: [u8; 2] = [0x49, 0xBA];
+        let movabs: [u8; 2] = [0x49, 0xBA]; // movabs r10
         let insn = [&movabs, &exec_addr8 as &[u8]].concat();
-        let insn2: [u8; 3] = [0x41, 0xFF, 0xE2];
-        // add nops till bytes_past
+        let insn2: [u8; 3] = [0x41, 0xFF, 0xE2]; // jmp r10
+        let mut insns = [&insn as &[u8], &insn2].concat();
+        let mut bytes: usize = 13;
+        let nop: [u8; 1] = [0x90]; // nop
+        while bytes < bytes_past {
+            insns = [&insns as &[u8], &nop].concat();
+            bytes += 1;
+        }
+        println!("{:x?}", insns);
         // send insns, exec_addr, replaced_code to mod
         // insert insns into netif_rx+0
         // in exec_addr, pull out sk_buff, append replaced_code, append jump to netif_rx+len(insns)
-
-        println!("{:x?}", insn);
     }
 
     return;
