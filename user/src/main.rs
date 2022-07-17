@@ -39,6 +39,7 @@ enum KsecCommand {
     GetSymbolAddr = 6,
     Read = 7,
     AllocExecMem = 8,
+    Hook = 9,
 }
 impl neli::consts::genl::Cmd for KsecCommand {}
 
@@ -46,9 +47,11 @@ impl neli::consts::genl::Cmd for KsecCommand {}
 enum KsecAttribute {
     Unspec = 0,
     Str = 1,
-    Bin = 2,
-    U64_0 = 3,
-    U64_1 = 4,
+    U64_0 = 2,
+    U64_1 = 3,
+    U64_2 = 4,
+    Bin_0 = 5,
+    Bin_1 = 6,
 }
 impl neli::consts::genl::NlAttrType for KsecAttribute {}
 
@@ -200,7 +203,7 @@ fn read_addr(addr: String, len: u64) -> Vec<u8> {
     );
     let res = send_netlink_message(KsecCommand::Read, attrs);
     let attr_handle = res.get_payload().unwrap().get_attr_handle();
-    attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::Bin).unwrap().to_vec()
+    attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::Bin_0).unwrap().to_vec()
 }
 
 const NR_SYSCALLS: usize = 449;
@@ -213,7 +216,7 @@ fn main() {
         let attrs: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
         let res = send_netlink_message(KsecCommand::GetIDTEntries, attrs);
         let attr_handle = res.get_payload().unwrap().get_attr_handle();
-        let attr = attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::Bin).unwrap();
+        let attr = attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::Bin_0).unwrap();
 
         let entries = unsafe { std::slice::from_raw_parts(attr.as_ptr() as *const Entry<HandlerFunc>, 256) };
 
@@ -235,7 +238,7 @@ fn main() {
         let attrs: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
         let res = send_netlink_message(KsecCommand::GetSyscalls, attrs);
         let attr_handle = res.get_payload().unwrap().get_attr_handle();
-        let attr = attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::Bin).unwrap();
+        let attr = attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::Bin_0).unwrap();
 
         let entries = unsafe { std::slice::from_raw_parts(attr.as_ptr() as *const u64, NR_SYSCALLS) };
 
@@ -257,7 +260,7 @@ fn main() {
         let attrs: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
         let res = send_netlink_message(KsecCommand::GetModules, attrs);
         let attr_handle = res.get_payload().unwrap().get_attr_handle();
-        let attr = attr_handle.get_attr_payload_as_with_len::<String>(KsecAttribute::Bin).unwrap();
+        let attr = attr_handle.get_attr_payload_as_with_len::<String>(KsecAttribute::Bin_0).unwrap();
 
         let modules = attr.split(' ');
 
@@ -356,10 +359,49 @@ fn main() {
             insns = [&insns as &[u8], &nop].concat();
             bytes += 1;
         }
-        println!("{:x?}", insns);
-        // send insns, exec_addr, replaced_code to mod
-        // insert insns into netif_rx+0
-        // in exec_addr, pull out sk_buff, append replaced_code, append jump to netif_rx+len(insns)
+
+        let mut attrs2: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
+        attrs2.push(
+            Nlattr::new(
+                false,
+                false,
+                KsecAttribute::U64_0,
+                u64::from_le_bytes(exec_addr8),
+            ).unwrap(),
+        );
+        attrs2.push(
+            Nlattr::new(
+                false,
+                false,
+                KsecAttribute::U64_1,
+                u64::from_le_bytes(addr_raw),
+            ).unwrap(),
+        );
+        attrs2.push(
+            Nlattr::new(
+                false,
+                false,
+                KsecAttribute::U64_2,
+                bytes_past as u64,
+            ).unwrap(),
+        );
+        attrs2.push(
+            Nlattr::new(
+                false,
+                false,
+                KsecAttribute::Bin_0,
+                insns,
+            ).unwrap(),
+        );
+        attrs2.push(
+            Nlattr::new(
+                false,
+                false,
+                KsecAttribute::Bin_1,
+                replaced_code,
+            ).unwrap(),
+        );
+        let res2 = send_netlink_message(KsecCommand::Hook, attrs2);
     }
 
     return;
