@@ -427,7 +427,7 @@ static int hook(struct sk_buff *skb, struct genl_info *info) {
 
   unsigned long old_cr0 = read_cr0();
   write_cr0_unsafe(old_cr0 & ~(X86_CR0_WP));
-  //memcpy((void *)hook_addr, insns, insns_len);
+  memcpy((void *)hook_addr, insns, insns_len);
   write_cr0_unsafe(old_cr0);
 
   // TODO: Pull out sk_buff param
