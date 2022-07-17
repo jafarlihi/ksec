@@ -25,6 +25,7 @@ use clap::Parser;
 use std::{fmt, str};
 use proc_modules::ModuleIter;
 use capstone::prelude::*;
+use std::mem::transmute;
 
 const FAMILY_NAME: &str = "ksec";
 
@@ -52,6 +53,7 @@ enum KsecAttribute {
     U64_2 = 4,
     Bin_0 = 5,
     Bin_1 = 6,
+    Bin_2 = 7,
 }
 impl neli::consts::genl::NlAttrType for KsecAttribute {}
 
@@ -360,6 +362,10 @@ fn main() {
             bytes += 1;
         }
 
+        let jmp_back_addr: [u8; 8] = unsafe { transmute((u64::from_le_bytes(addr_raw) + bytes_past as u64).to_le()) };
+        let mut jmp_back_insns = [&movabs, &jmp_back_addr as &[u8]].concat();
+        jmp_back_insns = [&jmp_back_insns as &[u8], &insn2].concat();
+
         let mut attrs2: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
         attrs2.push(
             Nlattr::new(
@@ -399,6 +405,14 @@ fn main() {
                 false,
                 KsecAttribute::Bin_1,
                 replaced_code,
+            ).unwrap(),
+        );
+        attrs2.push(
+            Nlattr::new(
+                false,
+                false,
+                KsecAttribute::Bin_2,
+                jmp_back_insns,
             ).unwrap(),
         );
         let res2 = send_netlink_message(KsecCommand::Hook, attrs2);

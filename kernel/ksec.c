@@ -18,6 +18,7 @@ enum {
   KSEC_A_U64_2,
   KSEC_A_BIN_0,
   KSEC_A_BIN_1,
+  KSEC_A_BIN_2,
   __KSEC_A_MAX,
 };
 #define KSEC_A_MAX (__KSEC_A_MAX - 1)
@@ -411,15 +412,26 @@ static int alloc_exec_mem(struct sk_buff *skb, struct genl_info *info) {
   return 0;
 }
 
+static void write_cr0_unsafe(unsigned long val) {
+  asm volatile("mov %0,%%cr0": "+r" (val) : : "memory");
+}
+
 static int hook(struct sk_buff *skb, struct genl_info *info) {
   u64 exec_addr = nla_get_u64(info->attrs[KSEC_A_U64_0]);
   u64 hook_addr = nla_get_u64(info->attrs[KSEC_A_U64_1]);
-  u64 replaced_len = nla_get_u64(info->attrs[KSEC_A_U64_2]);
+  u64 insns_len = nla_get_u64(info->attrs[KSEC_A_U64_2]);
   void *insns = nla_data(info->attrs[KSEC_A_BIN_0]);
   void *replaced = nla_data(info->attrs[KSEC_A_BIN_1]);
+  void *jmp_back_insns = nla_data(info->attrs[KSEC_A_BIN_2]);
 
-  // insert insns into netif_rx+0
-  // in exec_addr, pull out sk_buff, append replaced_code, append jump to netif_rx+len(insns)
+  unsigned long old_cr0 = read_cr0();
+  write_cr0_unsafe(old_cr0 & ~(X86_CR0_WP));
+  //memcpy((void *)hook_addr, insns, insns_len);
+  write_cr0_unsafe(old_cr0);
+
+  // TODO: Pull out sk_buff param
+  memcpy((void *)exec_addr, replaced, insns_len);
+  memcpy((char *)exec_addr + insns_len, jmp_back_insns, 13);
 
   struct sk_buff *reply_skb = genlmsg_new(sizeof(u64), GFP_KERNEL);
   if (reply_skb == NULL) {
