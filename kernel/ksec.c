@@ -481,7 +481,7 @@ static int get_shim_addr(struct sk_buff *skb, struct genl_info *info) {
   char *hooked = nla_data(info->attrs[KSEC_A_STR]);
   u64 addr;
 
-  if (strcmp(hooked, "netif_rx") addr = &consume_sk_buff;
+  if (strcmp(hooked, "netif_rx")) addr = &consume_sk_buff;
 
   struct sk_buff *reply_skb = genlmsg_new(sizeof(u64), GFP_KERNEL);
   if (reply_skb == NULL) {
