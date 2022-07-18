@@ -229,7 +229,7 @@ fn get_shim_addr(hooked: String) -> Vec<u8> {
     );
     let res = send_netlink_message(KsecCommand::GetShimAddr, attrs);
     let attr_handle = res.get_payload().unwrap().get_attr_handle();
-    attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::Bin_0).unwrap().to_vec()
+    attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::U64_0).unwrap().to_vec()
 }
 
 const NR_SYSCALLS: usize = 449;
