@@ -34,6 +34,7 @@ enum {
   KSEC_C_READ,
   KSEC_C_ALLOC_EXEC_MEM,
   KSEC_C_HOOK,
+  KSEC_C_GET_SHIM_ADDR,
   __KSEC_C_MAX,
 };
 #define KSEC_C_MAX (__KSEC_C_MAX - 1)
@@ -55,6 +56,7 @@ static int get_symbol_addr(struct sk_buff *, struct genl_info *);
 static int read(struct sk_buff *, struct genl_info *);
 static int alloc_exec_mem(struct sk_buff *, struct genl_info *);
 static int hook(struct sk_buff *, struct genl_info *);
+static int get_shim_addr(struct sk_buff *, struct genl_info *);
 static int is_kernel_addr(struct sk_buff *, struct genl_info *);
 static int is_module_addr(struct sk_buff *, struct genl_info *);
 
@@ -113,6 +115,12 @@ static struct genl_ops ksec_ops[] = {
     .policy = ksec_genl_policy,
     .doit = hook,
   },
+  {
+    .cmd = KSEC_C_GET_SHIM_ADDR,
+    .flags = 0,
+    .policy = ksec_genl_policy,
+    .doit = get_shim_addr,
+  },
 };
 
 static struct genl_family ksec_genl_family = {
@@ -122,7 +130,7 @@ static struct genl_family ksec_genl_family = {
   .version = 1,
   .maxattr = KSEC_A_MAX,
   .ops = ksec_ops,
-  .n_ops = 9,
+  .n_ops = 10,
 };
 
 typedef void *(*kallsyms_lookup_name_t)(const char *name);
@@ -457,6 +465,41 @@ static int hook(struct sk_buff *skb, struct genl_info *info) {
   }
 
   int rc = nla_put_u64_64bit(reply_skb, KSEC_A_U64_0, 1, 0);
+  if (rc != 0) {
+    pr_err("An error occurred in %s()\n", __func__);
+    return -rc;
+  }
+
+  genlmsg_end(reply_skb, msg_head);
+  rc = genlmsg_reply(reply_skb, info);
+  if (rc != 0) {
+    pr_err("An error occurred in %s()\n", __func__);
+    return -rc;
+  }
+
+  return 0;
+}
+
+static int get_shim_addr(struct sk_buff *skb, struct genl_info *info) {
+  char *hooked = nla_data(info->attrs[KSEC_A_STR]);
+  u64 addr;
+
+  if (strcmp(hooked, "netif_rx")
+      addr = &consume_sk_buff;
+
+  struct sk_buff *reply_skb = genlmsg_new(sizeof(u64), GFP_KERNEL);
+  if (reply_skb == NULL) {
+    pr_err("An error occurred in %s()\n", __func__);
+    return -ENOMEM;
+  }
+
+  void *msg_head = genlmsg_put(reply_skb, info->snd_portid, info->snd_seq + 1, &ksec_genl_family, 0, KSEC_C_GET_SHIM_ADDR);
+  if (msg_head == NULL) {
+    pr_err("An error occurred in %s()\n", __func__);
+    return -ENOMEM;
+  }
+
+  int rc = nla_put_u64_64bit(reply_skb, KSEC_A_U64_0, addr, 0);
   if (rc != 0) {
     pr_err("An error occurred in %s()\n", __func__);
     return -rc;
