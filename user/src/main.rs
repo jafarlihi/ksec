@@ -41,6 +41,7 @@ enum KsecCommand {
     Read = 7,
     AllocExecMem = 8,
     Hook = 9,
+    GetShimAddr = 10,
 }
 impl neli::consts::genl::Cmd for KsecCommand {}
 
@@ -208,6 +209,28 @@ fn read_addr(addr: String, len: u64) -> Vec<u8> {
     attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::Bin_0).unwrap().to_vec()
 }
 
+fn alloc_exec_mem() -> Vec<u8> {
+    let attrs: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
+    let res = send_netlink_message(KsecCommand::AllocExecMem, attrs);
+    let attr_handle = res.get_payload().unwrap().get_attr_handle();
+    attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::U64_0).unwrap().to_vec()
+}
+
+fn get_shim_addr(hooked: String) -> Vec<u8> {
+    let mut attrs: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
+    attrs.push(
+        Nlattr::new(
+            false,
+            false,
+            KsecAttribute::Str,
+            hooked,
+        ).unwrap(),
+    );
+    let res = send_netlink_message(KsecCommand::GetShimAddr, attrs);
+    let attr_handle = res.get_payload().unwrap().get_attr_handle();
+    attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::Bin_0).unwrap().to_vec()
+}
+
 const NR_SYSCALLS: usize = 449;
 
 fn main() {
@@ -343,10 +366,8 @@ fn main() {
 
         let replaced_code = data[0..bytes_past].to_vec();
 
-        let attrs: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
-        let res = send_netlink_message(KsecCommand::AllocExecMem, attrs);
-        let attr_handle = res.get_payload().unwrap().get_attr_handle();
-        let exec_addr = attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::U64_0).unwrap();
+        let exec_addr = alloc_exec_mem();
+        let shim_addr = get_shim_addr("netif_rx".to_string());
 
         let mut exec_addr8 = [0u8; 8];
         exec_addr8.clone_from_slice(&exec_addr[0..8]);
