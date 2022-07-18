@@ -438,21 +438,16 @@ static int hook(struct sk_buff *skb, struct genl_info *info) {
   void *insns = nla_data(info->attrs[KSEC_A_BIN_0]);
   void *replaced = nla_data(info->attrs[KSEC_A_BIN_1]);
   void *jmp_back_insns = nla_data(info->attrs[KSEC_A_BIN_2]);
+  void *shim_insns = nla_data(info->attrs[KSEC_A_BIN_3]);
 
   unsigned long old_cr0 = read_cr0();
   write_cr0_unsafe(old_cr0 & ~(X86_CR0_WP));
   memcpy((void *)hook_addr, insns, insns_len);
   write_cr0_unsafe(old_cr0);
 
-  unsigned __int128 shim = 0x49BA; // TODO
-
-  memcpy((void *)exec_addr, replaced, insns_len);
-  memcpy((char *)exec_addr + insns_len, jmp_back_insns, 13);
-  /*
-  memcpy((void *)exec_addr, &shim, shim_s);
-  memcpy((char *)exec_addr + shim_s, replaced, insns_len);
-  memcpy((char *)exec_addr + shim_s + insns_len, jmp_back_insns, 13);
-  */
+  memcpy((void *)exec_addr, &shim_insns, 13);
+  memcpy((char *)exec_addr + 13, replaced, insns_len);
+  memcpy((char *)exec_addr + 13 + insns_len, jmp_back_insns, 13);
 
   struct sk_buff *reply_skb = genlmsg_new(sizeof(u64), GFP_KERNEL);
   if (reply_skb == NULL) {
@@ -486,8 +481,7 @@ static int get_shim_addr(struct sk_buff *skb, struct genl_info *info) {
   char *hooked = nla_data(info->attrs[KSEC_A_STR]);
   u64 addr;
 
-  if (strcmp(hooked, "netif_rx")
-      addr = &consume_sk_buff;
+  if (strcmp(hooked, "netif_rx") addr = &consume_sk_buff;
 
   struct sk_buff *reply_skb = genlmsg_new(sizeof(u64), GFP_KERNEL);
   if (reply_skb == NULL) {
