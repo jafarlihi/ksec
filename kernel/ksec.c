@@ -19,6 +19,7 @@ enum {
   KSEC_A_BIN_0,
   KSEC_A_BIN_1,
   KSEC_A_BIN_2,
+  KSEC_A_BIN_3,
   __KSEC_A_MAX,
 };
 #define KSEC_A_MAX (__KSEC_A_MAX - 1)
@@ -47,6 +48,7 @@ static struct nla_policy ksec_genl_policy[KSEC_A_MAX + 1] = {
   [KSEC_A_BIN_0] = { .type = NLA_BINARY },
   [KSEC_A_BIN_1] = { .type = NLA_BINARY },
   [KSEC_A_BIN_2] = { .type = NLA_BINARY },
+  [KSEC_A_BIN_3] = { .type = NLA_BINARY },
 };
 
 static int get_idt_entries(struct sk_buff *, struct genl_info *);

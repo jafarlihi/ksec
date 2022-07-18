@@ -55,6 +55,7 @@ enum KsecAttribute {
     Bin_0 = 5,
     Bin_1 = 6,
     Bin_2 = 7,
+    Bin_3 = 8,
 }
 impl neli::consts::genl::NlAttrType for KsecAttribute {}
 
@@ -387,6 +388,10 @@ fn main() {
         let mut jmp_back_insns = [&movabs, &jmp_back_addr as &[u8]].concat();
         jmp_back_insns = [&jmp_back_insns as &[u8], &insn2].concat();
 
+        let mut shim_insns = [&movabs, &shim_addr as &[u8]].concat();
+        let insn3: [u8; 3] = [0x41, 0xFF, 0xD2]; // call r10
+        shim_insns = [&shim_insns as &[u8], &insn3].concat();
+
         let mut attrs2: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
         attrs2.push(
             Nlattr::new(
@@ -434,6 +439,14 @@ fn main() {
                 false,
                 KsecAttribute::Bin_2,
                 jmp_back_insns,
+            ).unwrap(),
+        );
+        attrs2.push(
+            Nlattr::new(
+                false,
+                false,
+                KsecAttribute::Bin_3,
+                shim_insns,
             ).unwrap(),
         );
         let res2 = send_netlink_message(KsecCommand::Hook, attrs2);
