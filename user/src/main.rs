@@ -365,7 +365,7 @@ fn main() {
             }
         }
 
-        let replaced_code = hooked_addr_data[0..bytes_past].to_vec();
+        let replaced_insns = hooked_addr_data[0..bytes_past].to_vec();
 
         let exec_addr = alloc_exec_mem();
         let shim_addr = get_shim_addr("netif_rx".to_string());
@@ -376,11 +376,11 @@ fn main() {
         let movabs: [u8; 2] = [0x49, 0xBA]; // movabs r10
         let movabs_with_addr = [&movabs, &exec_addr8 as &[u8]].concat();
         let jmp: [u8; 3] = [0x41, 0xFF, 0xE2]; // jmp r10
-        let mut insns = [&movabs_with_addr as &[u8], &jmp].concat();
+        let mut hook_insns = [&movabs_with_addr as &[u8], &jmp].concat();
         let mut bytes: usize = 13;
         let nop: [u8; 1] = [0x90]; // nop
         while bytes < bytes_past {
-            insns = [&insns as &[u8], &nop].concat();
+            hook_insns = [&hook_insns as &[u8], &nop].concat();
             bytes += 1;
         }
 
@@ -422,7 +422,7 @@ fn main() {
                 false,
                 false,
                 KsecAttribute::Bin_0,
-                insns,
+                hook_insns,
             ).unwrap(),
         );
         attrs2.push(
@@ -430,7 +430,7 @@ fn main() {
                 false,
                 false,
                 KsecAttribute::Bin_1,
-                replaced_code,
+                replaced_insns,
             ).unwrap(),
         );
         attrs2.push(
