@@ -332,9 +332,9 @@ fn main() {
     }
 
     if args.hook_netif_rx {
-        let addr_raw = get_symbol_addr("netif_rx".to_string());
-        let addr = format!("0x{:X}", u64::from_le_bytes(addr_raw));
-        let data = read_addr(addr, 50);
+        let hooked_addr = get_symbol_addr("netif_rx".to_string());
+        let hooked_addr_hex = format!("0x{:X}", u64::from_le_bytes(hooked_addr));
+        let hooked_addr_data = read_addr(hooked_addr_hex, 50);
 
         let cs = Capstone::new()
             .x86()
@@ -343,7 +343,7 @@ fn main() {
             .detail(true)
             .build()
             .expect("Failed to create Capstone object");
-        let insns = cs.disasm_all(&data as &[u8], u64::from_le_bytes(addr_raw)).expect("Failed to disassemble");
+        let insns = cs.disasm_all(&hooked_addr_data as &[u8], u64::from_le_bytes(hooked_addr)).expect("Failed to disassemble");
 
         let mut bytes_past: usize = 0;
         let mut insns_past: usize = 0;
@@ -365,7 +365,7 @@ fn main() {
             }
         }
 
-        let replaced_code = data[0..bytes_past].to_vec();
+        let replaced_code = hooked_addr_data[0..bytes_past].to_vec();
 
         let exec_addr = alloc_exec_mem();
         let shim_addr = get_shim_addr("netif_rx".to_string());
@@ -384,7 +384,7 @@ fn main() {
             bytes += 1;
         }
 
-        let jmp_back_addr: [u8; 8] = unsafe { transmute((u64::from_le_bytes(addr_raw) + bytes_past as u64).to_le()) };
+        let jmp_back_addr: [u8; 8] = unsafe { transmute((u64::from_le_bytes(hooked_addr) + bytes_past as u64).to_le()) };
         let mut jmp_back_insns = [&movabs, &jmp_back_addr as &[u8]].concat();
         jmp_back_insns = [&jmp_back_insns as &[u8], &jmp].concat();
 
@@ -406,7 +406,7 @@ fn main() {
                 false,
                 false,
                 KsecAttribute::U64_1,
-                u64::from_le_bytes(addr_raw),
+                u64::from_le_bytes(hooked_addr),
             ).unwrap(),
         );
         attrs2.push(
