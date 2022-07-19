@@ -374,9 +374,9 @@ fn main() {
         exec_addr8.clone_from_slice(&exec_addr[0..8]);
 
         let movabs: [u8; 2] = [0x49, 0xBA]; // movabs r10
-        let insn = [&movabs, &exec_addr8 as &[u8]].concat();
-        let insn2: [u8; 3] = [0x41, 0xFF, 0xE2]; // jmp r10
-        let mut insns = [&insn as &[u8], &insn2].concat();
+        let movabs_with_addr = [&movabs, &exec_addr8 as &[u8]].concat();
+        let jmp: [u8; 3] = [0x41, 0xFF, 0xE2]; // jmp r10
+        let mut insns = [&movabs_with_addr as &[u8], &jmp].concat();
         let mut bytes: usize = 13;
         let nop: [u8; 1] = [0x90]; // nop
         while bytes < bytes_past {
@@ -386,11 +386,11 @@ fn main() {
 
         let jmp_back_addr: [u8; 8] = unsafe { transmute((u64::from_le_bytes(addr_raw) + bytes_past as u64).to_le()) };
         let mut jmp_back_insns = [&movabs, &jmp_back_addr as &[u8]].concat();
-        jmp_back_insns = [&jmp_back_insns as &[u8], &insn2].concat();
+        jmp_back_insns = [&jmp_back_insns as &[u8], &jmp].concat();
 
         let mut shim_insns = [&movabs, &shim_addr as &[u8]].concat();
-        let insn3: [u8; 3] = [0x41, 0xFF, 0xD2]; // call r10
-        shim_insns = [&shim_insns as &[u8], &insn3].concat();
+        let call: [u8; 3] = [0x41, 0xFF, 0xD2]; // call r10
+        shim_insns = [&shim_insns as &[u8], &call].concat();
 
         let mut attrs2: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
         attrs2.push(
