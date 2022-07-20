@@ -392,8 +392,8 @@ fn main() {
         let call: [u8; 3] = [0x41, 0xFF, 0xD2]; // call r10
         shim_insns = [&shim_insns as &[u8], &call].concat();
 
-        let mut attrs2: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
-        attrs2.push(
+        let mut attrs: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
+        attrs.push(
             Nlattr::new(
                 false,
                 false,
@@ -401,7 +401,7 @@ fn main() {
                 u64::from_le_bytes(exec_addr8),
             ).unwrap(),
         );
-        attrs2.push(
+        attrs.push(
             Nlattr::new(
                 false,
                 false,
@@ -409,7 +409,7 @@ fn main() {
                 u64::from_le_bytes(hooked_addr),
             ).unwrap(),
         );
-        attrs2.push(
+        attrs.push(
             Nlattr::new(
                 false,
                 false,
@@ -417,7 +417,7 @@ fn main() {
                 bytes_past as u64,
             ).unwrap(),
         );
-        attrs2.push(
+        attrs.push(
             Nlattr::new(
                 false,
                 false,
@@ -425,7 +425,7 @@ fn main() {
                 hook_insns,
             ).unwrap(),
         );
-        attrs2.push(
+        attrs.push(
             Nlattr::new(
                 false,
                 false,
@@ -433,7 +433,7 @@ fn main() {
                 replaced_insns,
             ).unwrap(),
         );
-        attrs2.push(
+        attrs.push(
             Nlattr::new(
                 false,
                 false,
@@ -441,7 +441,7 @@ fn main() {
                 jmp_back_insns,
             ).unwrap(),
         );
-        attrs2.push(
+        attrs.push(
             Nlattr::new(
                 false,
                 false,
@@ -449,7 +449,7 @@ fn main() {
                 shim_insns,
             ).unwrap(),
         );
-        let res2 = send_netlink_message(KsecCommand::Hook, attrs2);
+        let res = send_netlink_message(KsecCommand::Hook, attrs);
     }
 
     return;
