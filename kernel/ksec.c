@@ -434,20 +434,20 @@ static void consume_sk_buff(struct sk_buff *skb) {
 static int hook(struct sk_buff *skb, struct genl_info *info) {
   u64 exec_addr = nla_get_u64(info->attrs[KSEC_A_U64_0]);
   u64 hook_addr = nla_get_u64(info->attrs[KSEC_A_U64_1]);
-  u64 insns_len = nla_get_u64(info->attrs[KSEC_A_U64_2]);
-  void *insns = nla_data(info->attrs[KSEC_A_BIN_0]);
-  void *replaced = nla_data(info->attrs[KSEC_A_BIN_1]);
+  u64 hook_insns_len = nla_get_u64(info->attrs[KSEC_A_U64_2]);
+  void *hook_insns = nla_data(info->attrs[KSEC_A_BIN_0]);
+  void *replaced_insns = nla_data(info->attrs[KSEC_A_BIN_1]);
   void *jmp_back_insns = nla_data(info->attrs[KSEC_A_BIN_2]);
   void *shim_insns = nla_data(info->attrs[KSEC_A_BIN_3]);
 
   unsigned long old_cr0 = read_cr0();
   write_cr0_unsafe(old_cr0 & ~(X86_CR0_WP));
-  memcpy((void *)hook_addr, insns, insns_len);
+  memcpy((void *)hook_addr, hook_insns, hook_insns_len);
   write_cr0_unsafe(old_cr0);
 
   memcpy((void *)exec_addr, shim_insns, 13);
-  memcpy((char *)exec_addr + 13, replaced, insns_len);
-  memcpy((char *)exec_addr + 13 + insns_len, jmp_back_insns, 13);
+  memcpy((char *)exec_addr + 13, replaced_insns, hook_insns_len);
+  memcpy((char *)exec_addr + 13 + hook_insns_len, jmp_back_insns, 13);
 
   struct sk_buff *reply_skb = genlmsg_new(sizeof(u64), GFP_KERNEL);
   if (reply_skb == NULL) {
