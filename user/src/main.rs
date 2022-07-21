@@ -42,6 +42,7 @@ enum KsecCommand {
     AllocExecMem = 8,
     Hook = 9,
     GetShimAddr = 10,
+    Kprobe = 11,
 }
 impl neli::consts::genl::Cmd for KsecCommand {}
 
@@ -111,9 +112,12 @@ struct Args {
     /// Disassemble `read` command output
     #[clap(short = 'd', long, value_parser)]
     disassemble: bool,
-    /// Hook an arbitrary kernel function [experimental feature]
-    #[clap(short = 'n', long, value_parser, value_names=&["hooked_function"])]
+    /// Hook an arbitrary kernel function with a custom method [experimental feature]
+    #[clap(short = 'h', long, value_parser, value_names=&["hooked_function"])]
     hook: Option<String>,
+    /// Hook an arbitrary kernel function with a kprobe [experimental feature]
+    #[clap(short = 'h', long, value_parser, value_names=&["hooked_function"])]
+    kprobe: Option<String>,
 }
 
 fn virtaddr_to_nlattr(va: VirtAddr) -> GenlBuffer<KsecAttribute, Buffer> {
@@ -458,6 +462,24 @@ fn main() {
             ).unwrap(),
         );
         let res = send_netlink_message(KsecCommand::Hook, attrs);
+    }
+
+    if !args.kprobe.is_none() {
+        let hooked = args.kprobe.unwrap();
+
+        let mut attrs: GenlBuffer<KsecAttribute, Buffer> = GenlBuffer::new();
+        attrs.push(
+            Nlattr::new(
+                false,
+                false,
+                KsecAttribute::Str,
+                hooked,
+            ).unwrap(),
+        );
+        let res = send_netlink_message(KsecCommand::Kprobe, attrs);
+        let attr_handle = res.get_payload().unwrap().get_attr_handle();
+        let ret = attr_handle.get_attr_payload_as_with_len::<&[u8]>(KsecAttribute::U64_0).unwrap().to_vec();
+        info!("{:?}", ret);
     }
 
     return;
