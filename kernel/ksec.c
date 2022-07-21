@@ -427,8 +427,8 @@ static void write_cr0_unsafe(unsigned long val) {
   asm volatile("mov %0,%%cr0": "+r" (val) : : "memory");
 }
 
-static void consume_sk_buff(struct sk_buff *skb) {
-  printk("%x\n", skb);
+static void shim(void) {
+  printk("Inside shim\n");
 }
 
 static int hook(struct sk_buff *skb, struct genl_info *info) {
@@ -481,7 +481,8 @@ static int get_shim_addr(struct sk_buff *skb, struct genl_info *info) {
   char *hooked = nla_data(info->attrs[KSEC_A_STR]);
   u64 addr;
 
-  if (strcmp(hooked, "netif_rx") == 0) addr = (u64)&consume_sk_buff;
+  //if (strcmp(hooked, "netif_rx") == 0) addr = (u64)&consume_sk_buff;
+  addr = (u64)&shim;
 
   struct sk_buff *reply_skb = genlmsg_new(sizeof(u64), GFP_KERNEL);
   if (reply_skb == NULL) {

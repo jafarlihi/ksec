@@ -93,20 +93,27 @@ fn send_netlink_message(cmd: KsecCommand, attrs: GenlBuffer<KsecAttribute, Buffe
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
+    /// List interrupt descriptor table entries
     #[clap(short = 'i', long, value_parser)]
     get_idt_entries: bool,
+    /// List syscalls
     #[clap(short = 's', long, value_parser)]
     get_syscalls: bool,
+    /// List Linux Kernel Modules
     #[clap(short = 'm', long, value_parser)]
     get_modules: bool,
+    /// Get address of a kernel symbol
     #[clap(short = 'a', long, value_parser, value_names=&["symbol"])]
     get_symbol_addr: Option<String>,
+    /// Read content from an address
     #[clap(short = 'r', long, value_parser, number_of_values = 2, value_names=&["addr [hex with 0x]", "len"])]
     read: Option<Vec<String>>,
+    /// Disassemble `read` command output
     #[clap(short = 'd', long, value_parser)]
     disassemble: bool,
-    #[clap(short = 'n', long, value_parser)]
-    hook_netif_rx: bool,
+    /// Hook an arbitrary kernel function [experimental feature]
+    #[clap(short = 'n', long, value_parser, value_names=&["hooked_function"])]
+    hook: Option<String>,
 }
 
 fn virtaddr_to_nlattr(va: VirtAddr) -> GenlBuffer<KsecAttribute, Buffer> {
@@ -331,8 +338,9 @@ fn main() {
         }
     }
 
-    if args.hook_netif_rx {
-        let hooked_addr = get_symbol_addr("netif_rx".to_string());
+    if !args.hook.is_none() {
+        let hooked_function = args.hook.unwrap();
+        let hooked_addr = get_symbol_addr(hooked_function.clone());
         let hooked_addr_hex = format!("0x{:X}", u64::from_le_bytes(hooked_addr));
         let hooked_addr_data = read_addr(hooked_addr_hex, 50);
 
@@ -368,7 +376,7 @@ fn main() {
         let replaced_insns = hooked_addr_data[0..bytes_past].to_vec();
 
         let exec_addr = alloc_exec_mem();
-        let shim_addr = get_shim_addr("netif_rx".to_string());
+        let shim_addr = get_shim_addr(hooked_function.clone());
 
         let mut exec_addr8 = [0u8; 8];
         exec_addr8.clone_from_slice(&exec_addr[0..8]);
