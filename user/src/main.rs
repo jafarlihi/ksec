@@ -116,7 +116,7 @@ struct Args {
     #[clap(short = 'h', long, value_parser, value_names=&["hooked_function"])]
     hook: Option<String>,
     /// Hook an arbitrary kernel function with a kprobe [experimental feature]
-    #[clap(short = 'h', long, value_parser, value_names=&["hooked_function"])]
+    #[clap(short = 'k', long, value_parser, value_names=&["hooked_function"])]
     kprobe: Option<String>,
 }
 
